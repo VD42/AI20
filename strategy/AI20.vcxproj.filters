@@ -1,0 +1,174 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="model">
+      <UniqueIdentifier>{5788b454-ae78-49f7-a456-e9a4dd454adf}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="model\Action.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\AttackAction.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\AttackProperties.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\AutoAttack.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\BuildAction.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\BuildProperties.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\Camera.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\ClientMessage.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\Color.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\ColoredVertex.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\DebugCommand.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\DebugData.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\DebugState.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\Entity.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\EntityAction.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\EntityProperties.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\MoveAction.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\Player.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\PlayerView.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\RepairAction.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\RepairProperties.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\ServerMessage.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\Vec2Float.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="model\Vec2Int.cpp">
+      <Filter>model</Filter>
+    </ClCompile>
+    <ClCompile Include="DebugInterface.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="MyStrategy.cpp" />
+    <ClCompile Include="Stream.cpp" />
+    <ClCompile Include="TcpStream.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="model\Action.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\AttackAction.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\AttackProperties.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\AutoAttack.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\BuildAction.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\BuildProperties.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\Camera.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\ClientMessage.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\Color.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\ColoredVertex.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\DebugCommand.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\DebugData.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\DebugState.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\Entity.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\EntityAction.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\EntityProperties.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\EntityType.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\Model.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\MoveAction.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\Player.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\PlayerView.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\PrimitiveType.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\RepairAction.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\RepairProperties.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\ServerMessage.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\Vec2Float.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="model\Vec2Int.hpp">
+      <Filter>model</Filter>
+    </ClInclude>
+    <ClInclude Include="DebugInterface.hpp" />
+    <ClInclude Include="MyStrategy.hpp" />
+    <ClInclude Include="Stream.hpp" />
+    <ClInclude Include="TcpStream.hpp" />
+  </ItemGroup>
+</Project>
