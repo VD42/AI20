@@ -173,16 +173,28 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         return entity.position;
     };
 
+    const auto distance = [&] (Entity const& entity1, Entity const& entity2) {
+        int mind = playerView.mapSize * 2;
+        for (int i = entity2.position.x; i < entity2.position.x + playerView.entityProperties.at(entity2.entityType).size; ++i)
+            for (int j = entity2.position.y; j < entity2.position.y + playerView.entityProperties.at(entity2.entityType).size; ++j)
+            {
+                const auto d = std::abs(entity1.position.x - i) + std::abs(entity1.position.y - j);
+                if (d < mind)
+                    mind = d;
+            }
+        return mind;
+    };
+
     const auto get_closest_entity = [&] (Entity const& entity, std::vector<int> const& entities) {
-        auto distance = playerView.mapSize * 2;
+        auto mind = playerView.mapSize * 2;
         int result = 0;
         for (auto const& e : entities)
         {
-            const auto d = std::abs(entity.position.x - playerView.entities[id_to_index[e]].position.x) + std::abs(entity.position.y - playerView.entities[id_to_index[e]].position.y);
-            if (d < distance)
+            const auto d = distance(entity, playerView.entities[id_to_index[e]]);
+            if (d < mind)
             {
                 result = e;
-                distance = d;
+                mind = d;
             }
         }
         return result;
@@ -195,8 +207,11 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         return 0;
     }();
 
+    int need_melee_bases = 0;
+    int need_ranged_bases = 1 + (builders / 20);
+
     const auto action_for_builder_unit = [&] (Entity const& entity) {
-        if (builder_bases < 1 && playerView.entityProperties.at(EntityType::BUILDER_BASE).cost <= current_resources)
+        if (builder_bases < need_melee_bases && playerView.entityProperties.at(EntityType::BUILDER_BASE).cost <= current_resources)
         {
             const auto pos = find_place_for_base(entity, EntityType::BUILDER_BASE);
             if (pos.x != entity.position.x && pos.y != entity.position.y)
@@ -206,7 +221,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
                 return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::BUILDER_BASE, pos), nullptr, nullptr);
             }
         }
-        if (ranged_bases < 1 && playerView.entityProperties.at(EntityType::RANGED_BASE).cost <= current_resources)
+        if (ranged_bases < need_ranged_bases && playerView.entityProperties.at(EntityType::RANGED_BASE).cost <= current_resources)
         {
             const auto pos = find_place_for_base(entity, EntityType::RANGED_BASE);
             if (pos.x != entity.position.x && pos.y != entity.position.y)
@@ -219,12 +234,15 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         if (!to_repair.empty())
         {
             const auto id = get_closest_entity(entity, to_repair);
-            return EntityAction(
-                std::make_unique<MoveAction>(playerView.entities[id_to_index[id]].position, true, false),
-                nullptr,
-                nullptr,
-                std::make_unique<RepairAction>(id)
-            );
+            if (playerView.entities[id_to_index[id]].entityType != EntityType::MELEE_BASE && distance(entity, playerView.entities[id_to_index[id]]) <= (playerView.entities[id_to_index[id]].entityType == EntityType::HOUSE ? 1 : 5))
+            {
+                return EntityAction(
+                    std::make_unique<MoveAction>(playerView.entities[id_to_index[id]].position, true, false),
+                    nullptr,
+                    nullptr,
+                    std::make_unique<RepairAction>(id)
+                );
+            }
         }
         if (units_limit <= units && playerView.entityProperties.at(EntityType::HOUSE).cost <= current_resources)
         {
@@ -243,7 +261,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         );
     };
 
-    auto need_builders = std::max(10, static_cast<int>(units_limit * 0.3));
+    auto need_builders = std::max(20, static_cast<int>(units_limit * 0.5));
 
     const auto action_for_builder_base = [&] (Entity const& entity) {
         if (builders < need_builders)
