@@ -219,7 +219,12 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         if (!to_repair.empty())
         {
             const auto id = get_closest_entity(entity, to_repair);
-            return EntityAction(nullptr, nullptr, nullptr, std::make_unique<RepairAction>(id));
+            return EntityAction(
+                std::make_unique<MoveAction>(playerView.entities[id_to_index[id]].position, true, false),
+                nullptr,
+                nullptr,
+                std::make_unique<RepairAction>(id)
+            );
         }
         if (units_limit <= units && playerView.entityProperties.at(EntityType::HOUSE).cost <= current_resources)
         {
