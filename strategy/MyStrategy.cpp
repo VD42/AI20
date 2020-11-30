@@ -37,6 +37,9 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
 
     int builders = 0;
 
+    int builder_bases = 0;
+    int ranged_bases = 0;
+
     size_t index = 0;
     for (auto const& entity : playerView.entities)
     {
@@ -71,6 +74,10 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             resources.emplace_back(entity.id);
         if (entity.playerId && *entity.playerId == playerView.myId && entity.entityType == EntityType::BUILDER_UNIT)
             ++builders;
+        if (entity.playerId && *entity.playerId == playerView.myId && entity.entityType == EntityType::BUILDER_BASE)
+            ++builder_bases;
+        if (entity.playerId && *entity.playerId == playerView.myId && entity.entityType == EntityType::RANGED_BASE)
+            ++ranged_bases;
     }
 
     const auto find_place_for_unit = [&] (Entity const& entity) {
@@ -89,13 +96,14 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         return entity.position;
     };
 
-    const auto find_place_for_house = [&] (Entity const& entity) {
-        for (int start_y = entity.position.y - playerView.entityProperties.at(EntityType::HOUSE).size + 1; start_y <= entity.position.y; ++start_y)
+    const auto find_place_for_base = [&] (Entity const& entity, EntityType type) {
+        const auto size = playerView.entityProperties.at(type).size;
+        for (int start_y = entity.position.y - size + 1; start_y <= entity.position.y; ++start_y)
         {
             bool good = true;
-            for (int i = entity.position.x - playerView.entityProperties.at(EntityType::HOUSE).size; i < entity.position.x; ++i)
+            for (int i = entity.position.x - size; i < entity.position.x; ++i)
             {
-                for (int j = start_y; j < start_y + playerView.entityProperties.at(EntityType::HOUSE).size; ++j)
+                for (int j = start_y; j < start_y + size; ++j)
                     if (get_placement(i, j) != 0)
                     {
                         good = false;
@@ -105,15 +113,15 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
                     break;
             }
             if (good)
-                return Vec2Int(entity.position.x - playerView.entityProperties.at(EntityType::HOUSE).size, start_y);
+                return Vec2Int(entity.position.x - size, start_y);
         }
 
-        for (int start_x = entity.position.x - playerView.entityProperties.at(EntityType::HOUSE).size + 1; start_x <= entity.position.x; ++start_x)
+        for (int start_x = entity.position.x - size + 1; start_x <= entity.position.x; ++start_x)
         {
             bool good = true;
-            for (int j = entity.position.y - playerView.entityProperties.at(EntityType::HOUSE).size; j < entity.position.y; ++j)
+            for (int j = entity.position.y - size; j < entity.position.y; ++j)
             {
-                for (int i = start_x; i < start_x + playerView.entityProperties.at(EntityType::HOUSE).size; ++i)
+                for (int i = start_x; i < start_x + size; ++i)
                     if (get_placement(i, j) != 0)
                     {
                         good = false;
@@ -123,15 +131,15 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
                     break;
             }
             if (good)
-                return Vec2Int(start_x, entity.position.y - playerView.entityProperties.at(EntityType::HOUSE).size);
+                return Vec2Int(start_x, entity.position.y - size);
         }
 
-        for (int start_x = entity.position.x - playerView.entityProperties.at(EntityType::HOUSE).size + 1; start_x <= entity.position.x; ++start_x)
+        for (int start_x = entity.position.x - size + 1; start_x <= entity.position.x; ++start_x)
         {
             bool good = true;
-            for (int j = entity.position.y + 1; j <= entity.position.y + playerView.entityProperties.at(EntityType::HOUSE).size; ++j)
+            for (int j = entity.position.y + 1; j <= entity.position.y + size; ++j)
             {
-                for (int i = start_x; i < start_x + playerView.entityProperties.at(EntityType::HOUSE).size; ++i)
+                for (int i = start_x; i < start_x + size; ++i)
                     if (get_placement(i, j) != 0)
                     {
                         good = false;
@@ -144,12 +152,12 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
                 return Vec2Int(start_x, entity.position.y + 1);
         }
 
-        for (int start_y = entity.position.y - playerView.entityProperties.at(EntityType::HOUSE).size + 1; start_y <= entity.position.y; ++start_y)
+        for (int start_y = entity.position.y - size + 1; start_y <= entity.position.y; ++start_y)
         {
             bool good = true;
-            for (int i = entity.position.x + 1; i <= entity.position.x + playerView.entityProperties.at(EntityType::HOUSE).size; ++i)
+            for (int i = entity.position.x + 1; i <= entity.position.x + size; ++i)
             {
-                for (int j = start_y; j < start_y + playerView.entityProperties.at(EntityType::HOUSE).size; ++j)
+                for (int j = start_y; j < start_y + size; ++j)
                     if (get_placement(i, j) != 0)
                     {
                         good = false;
@@ -188,6 +196,26 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
     }();
 
     const auto action_for_builder_unit = [&] (Entity const& entity) {
+        if (builder_bases < 1 && playerView.entityProperties.at(EntityType::BUILDER_BASE).cost <= current_resources)
+        {
+            const auto pos = find_place_for_base(entity, EntityType::BUILDER_BASE);
+            if (pos.x != entity.position.x && pos.y != entity.position.y)
+            {
+                units_limit += 5;
+                builder_bases += 1;
+                return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::BUILDER_BASE, pos), nullptr, nullptr);
+            }
+        }
+        if (ranged_bases < 1 && playerView.entityProperties.at(EntityType::RANGED_BASE).cost <= current_resources)
+        {
+            const auto pos = find_place_for_base(entity, EntityType::RANGED_BASE);
+            if (pos.x != entity.position.x && pos.y != entity.position.y)
+            {
+                units_limit += 5;
+                builder_bases += 1;
+                return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::RANGED_BASE, pos), nullptr, nullptr);
+            }
+        }
         if (!to_repair.empty())
         {
             const auto id = get_closest_entity(entity, to_repair);
@@ -195,7 +223,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         }
         if (units_limit <= units && playerView.entityProperties.at(EntityType::HOUSE).cost <= current_resources)
         {
-            const auto pos = find_place_for_house(entity);
+            const auto pos = find_place_for_base(entity, EntityType::HOUSE);
             if (pos.x != entity.position.x && pos.y != entity.position.y)
             {
                 units_limit += 5;
