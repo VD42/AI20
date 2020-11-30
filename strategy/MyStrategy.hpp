@@ -4,11 +4,12 @@
 #include "DebugInterface.hpp"
 #include "model/Model.hpp"
 
-class MyStrategy {
+class MyStrategy
+{
 public:
-    MyStrategy();
-    Action getAction(const PlayerView& playerView, DebugInterface* debugInterface);
-    void debugUpdate(const PlayerView& playerView, DebugInterface& debugInterface);
+    MyStrategy() = default;
+    Action getAction(PlayerView const& playerView, DebugInterface * debugInterface);
+    void debugUpdate(PlayerView const& playerView, DebugInterface & debugInterface);
 };
 
 #endif
