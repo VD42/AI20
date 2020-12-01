@@ -38,6 +38,8 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
 
     std::vector<std::tuple<int, int, int>> order;
 
+    std::vector<int> danger;
+
     int builders = 0;
 
     int builder_bases = 0;
@@ -104,6 +106,8 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             ++builder_bases;
         if (entity.playerId && *entity.playerId == playerView.myId && entity.entityType == EntityType::RANGED_BASE)
             ++ranged_bases;
+        if (entity.playerId && *entity.playerId != playerView.myId && (entity.entityType == EntityType::MELEE_UNIT || entity.entityType == EntityType::RANGED_UNIT || entity.entityType == EntityType::TURRET))
+            danger.emplace_back(entity.id);
     }
 
     std::sort(order.begin(), order.end());
@@ -247,11 +251,18 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         return true;
     };
 
+    const auto pos_is_danger = [&] (Vec2Int const& pos) {
+        for (auto const& id : danger)
+            if (std::abs(playerView.entities[id_to_index[id]].position.x - pos.x) + std::abs(playerView.entities[id_to_index[id]].position.y - pos.y) < 15)
+                return true;
+        return false;
+    };
+
     const auto action_for_builder_unit = [&] (Entity const& entity) {
         if (builder_bases < need_builder_bases)
         {
             const auto pos = find_place_for_base(entity, EntityType::BUILDER_BASE);
-            if (pos.x != entity.position.x && pos.y != entity.position.y)
+            if (pos.x != entity.position.x && pos.y != entity.position.y && !pos_is_danger(pos))
             {
                 current_resources -= playerView.entityProperties.at(EntityType::BUILDER_BASE).cost;
                 if (0 <= current_resources)
@@ -265,7 +276,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         else if (ranged_bases < need_ranged_bases)
         {
             const auto pos = find_place_for_base(entity, EntityType::RANGED_BASE);
-            if (pos.x != entity.position.x && pos.y != entity.position.y)
+            if (pos.x != entity.position.x && pos.y != entity.position.y && !pos_is_danger(pos))
             {
                 current_resources -= playerView.entityProperties.at(EntityType::RANGED_BASE).cost;
                 if (0 <= current_resources)
@@ -279,7 +290,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         else if (units_limit <= units + 4 * (builder_bases + ranged_bases))
         {
             const auto pos = find_place_for_base(entity, EntityType::HOUSE);
-            if (pos.x != entity.position.x && pos.y != entity.position.y)
+            if (pos.x != entity.position.x && pos.y != entity.position.y && !pos_is_danger(pos))
             {
                 current_resources -= playerView.entityProperties.at(EntityType::HOUSE).cost;
                 if (0 <= current_resources)
