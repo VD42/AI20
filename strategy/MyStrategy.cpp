@@ -1,5 +1,6 @@
 #include "MyStrategy.hpp"
 #include <memory>
+#include <algorithm>
 
 Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debugInterface)
 {
@@ -35,6 +36,8 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
 
     std::vector<int> resources;
 
+    std::vector<std::tuple<int, int, int>> order;
+
     int builders = 0;
 
     int builder_bases = 0;
@@ -43,9 +46,32 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
     size_t index = 0;
     for (auto const& entity : playerView.entities)
     {
+        if (entity.playerId && *entity.playerId == playerView.myId)
+        {
+            order.emplace_back(std::make_tuple(
+                [&] () {
+                    switch (entity.entityType)
+                    {
+                    case EntityType::BUILDER_UNIT: return 0;
+                    case EntityType::BUILDER_BASE: return 1;
+                    case EntityType::RANGED_BASE: return 2;
+                    case EntityType::MELEE_BASE: return 3;
+                    case EntityType::RANGED_UNIT: return 4;
+                    case EntityType::MELEE_UNIT: return 5;
+                    case EntityType::TURRET: return 6;
+                    }
+                    return 100;
+                }(),
+                entity.position.x + entity.position.y,
+                entity.id
+            ));
+        }
         id_to_index[entity.id] = index++;
-        for (int i = entity.position.x; i < entity.position.x + playerView.entityProperties.at(entity.entityType).size; ++i)
-            for (int j = entity.position.y; j < entity.position.y + playerView.entityProperties.at(entity.entityType).size; ++j)
+        int border = 0;
+        if (entity.playerId && *entity.playerId == playerView.myId && (entity.entityType == EntityType::BUILDER_BASE || entity.entityType == EntityType::MELEE_BASE || entity.entityType == EntityType::RANGED_BASE || entity.entityType == EntityType::HOUSE || entity.entityType == EntityType::TURRET))
+            border = 1;
+        for (int i = entity.position.x - border; i < entity.position.x + playerView.entityProperties.at(entity.entityType).size + border; ++i)
+            for (int j = entity.position.y - border; j < entity.position.y + playerView.entityProperties.at(entity.entityType).size + border; ++j)
                 get_placement(i, j) = entity.id;
         if (entity.playerId && *entity.playerId == playerView.myId && (entity.entityType == EntityType::BUILDER_BASE || entity.entityType == EntityType::MELEE_BASE || entity.entityType == EntityType::RANGED_BASE))
         {
@@ -80,6 +106,8 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             ++ranged_bases;
     }
 
+    std::sort(order.begin(), order.end());
+
     const auto find_place_for_unit = [&] (Entity const& entity) {
         for (int j = entity.position.y + playerView.entityProperties.at(entity.entityType).size - 1; entity.position.y <= j; --j)
             if (get_placement(entity.position.x + playerView.entityProperties.at(entity.entityType).size, j) == -entity.id)
@@ -98,6 +126,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
 
     const auto find_place_for_base = [&] (Entity const& entity, EntityType type) {
         const auto size = playerView.entityProperties.at(type).size;
+
         for (int start_y = entity.position.y - size + 1; start_y <= entity.position.y; ++start_y)
         {
             bool good = true;
@@ -207,28 +236,57 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         return 0;
     }();
 
+    int need_builder_bases = 1;
+    int need_ranged_bases = 1 + (builders / 30);
     int need_melee_bases = 0;
-    int need_ranged_bases = 1 + (builders / 20);
+
+    const auto bases_ok = [&] () {
+        if (builder_bases < need_builder_bases) return false;
+        if (ranged_bases < need_ranged_bases) return false;
+        if (units_limit <= units + 4 * (builder_bases + ranged_bases)) return false;
+        return true;
+    };
 
     const auto action_for_builder_unit = [&] (Entity const& entity) {
-        if (builder_bases < need_melee_bases && playerView.entityProperties.at(EntityType::BUILDER_BASE).cost <= current_resources)
+        if (builder_bases < need_builder_bases)
         {
             const auto pos = find_place_for_base(entity, EntityType::BUILDER_BASE);
             if (pos.x != entity.position.x && pos.y != entity.position.y)
             {
-                units_limit += 5;
-                builder_bases += 1;
-                return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::BUILDER_BASE, pos), nullptr, nullptr);
+                current_resources -= playerView.entityProperties.at(EntityType::BUILDER_BASE).cost;
+                if (0 <= current_resources)
+                {
+                    units_limit += 5;
+                    builder_bases += 1;
+                    return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::BUILDER_BASE, pos), nullptr, nullptr);
+                }
             }
         }
-        if (ranged_bases < need_ranged_bases && playerView.entityProperties.at(EntityType::RANGED_BASE).cost <= current_resources)
+        else if (ranged_bases < need_ranged_bases)
         {
             const auto pos = find_place_for_base(entity, EntityType::RANGED_BASE);
             if (pos.x != entity.position.x && pos.y != entity.position.y)
             {
-                units_limit += 5;
-                builder_bases += 1;
-                return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::RANGED_BASE, pos), nullptr, nullptr);
+                current_resources -= playerView.entityProperties.at(EntityType::RANGED_BASE).cost;
+                if (0 <= current_resources)
+                {
+                    units_limit += 5;
+                    ranged_bases += 1;
+                    return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::RANGED_BASE, pos), nullptr, nullptr);
+                }
+            }
+        }
+        else if (units_limit <= units + 4 * (builder_bases + ranged_bases))
+        {
+            const auto pos = find_place_for_base(entity, EntityType::HOUSE);
+            if (pos.x != entity.position.x && pos.y != entity.position.y)
+            {
+                current_resources -= playerView.entityProperties.at(EntityType::HOUSE).cost;
+                if (0 <= current_resources)
+                {
+                    units_limit += 5;
+                    return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::HOUSE, pos), nullptr, nullptr);
+                }
             }
         }
         if (!to_repair.empty())
@@ -244,15 +302,6 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
                 );
             }
         }
-        if (units_limit <= units && playerView.entityProperties.at(EntityType::HOUSE).cost <= current_resources)
-        {
-            const auto pos = find_place_for_base(entity, EntityType::HOUSE);
-            if (pos.x != entity.position.x && pos.y != entity.position.y)
-            {
-                units_limit += 5;
-                return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::HOUSE, pos), nullptr, nullptr);
-            }
-        }
         return EntityAction(
             std::make_unique<MoveAction>(playerView.entities[id_to_index[get_closest_entity(entity, resources)]].position, true, false),
             nullptr,
@@ -264,17 +313,29 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
     auto need_builders = std::max(20, static_cast<int>(units_limit * 0.5));
 
     const auto action_for_builder_base = [&] (Entity const& entity) {
-        if (builders < need_builders)
+        if (bases_ok() && builders < need_builders)
         {
-            const auto pos = find_place_for_unit(entity);
-            return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::BUILDER_UNIT, pos), nullptr, nullptr);
+            current_resources -= playerView.entityProperties.at(EntityType::BUILDER_UNIT).cost;
+            if (0 <= current_resources)
+            {
+                const auto pos = find_place_for_unit(entity);
+                return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::BUILDER_UNIT, pos), nullptr, nullptr);
+            }
         }
         return EntityAction(nullptr, nullptr, nullptr, nullptr);
     };
 
     const auto action_for_ranged_base = [&] (Entity const& entity) {
-        const auto pos = find_place_for_unit(entity);
-        return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::RANGED_UNIT, pos), nullptr, nullptr);
+        if (bases_ok())
+        {
+            current_resources -= playerView.entityProperties.at(EntityType::RANGED_UNIT).cost;
+            if (0 <= current_resources)
+            {
+                const auto pos = find_place_for_unit(entity);
+                return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::RANGED_UNIT, pos), nullptr, nullptr);
+            }
+        }
+        return EntityAction(nullptr, nullptr, nullptr, nullptr);
     };
 
     const auto action_for_melee_base = [&] (Entity const& entity) {
@@ -292,10 +353,9 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
 
     std::unordered_map<int, EntityAction> actions;
 
-    for (auto const& entity : playerView.entities)
+    for (auto const& o : order)
     {
-        if (!entity.playerId || *entity.playerId != playerView.myId)
-            continue;
+        auto const& entity = playerView.entities[id_to_index[std::get<2>(o)]];
         switch (entity.entityType)
         {
         case EntityType::BUILDER_UNIT:
