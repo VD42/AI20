@@ -233,6 +233,21 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         return result;
     };
 
+    const auto get_closest_to_base_entity = [&] (std::vector<int> const& entities) {
+        auto mind = playerView.mapSize * 2;
+        int result = 0;
+        for (auto const& e : entities)
+        {
+            const auto d = playerView.entities[id_to_index[e]].position.x + playerView.entities[id_to_index[e]].position.y;
+            if (d < mind)
+            {
+                result = e;
+                mind = d;
+            }
+        }
+        return result;
+    };
+
     int current_resources = [&] () {
         for (auto const& player : playerView.players)
             if (player.id == playerView.myId)
@@ -314,7 +329,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             }
         }
         return EntityAction(
-            std::make_unique<MoveAction>(playerView.entities[id_to_index[get_closest_entity(entity, resources)]].position, true, false),
+            std::make_unique<MoveAction>(playerView.entities[id_to_index[get_closest_to_base_entity(resources)]].position, true, false),
             nullptr,
             std::make_unique<AttackAction>(nullptr, std::make_unique<AutoAttack>(playerView.mapSize * 2, std::vector<EntityType> { EntityType::RESOURCE })),
             nullptr
@@ -355,7 +370,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
 
     const auto action_for_ranged_unit = [&] (Entity const& entity) {
         return EntityAction(
-            std::make_unique<MoveAction>(playerView.entities[id_to_index[get_closest_entity(entity, to_attack)]].position, true, false),
+            std::make_unique<MoveAction>(playerView.entities[id_to_index[get_closest_to_base_entity(to_attack)]].position, true, false),
             nullptr,
             std::make_unique<AttackAction>(nullptr, std::make_unique<AutoAttack>(playerView.mapSize * 2, std::vector<EntityType> { EntityType::HOUSE, EntityType::BUILDER_BASE, EntityType::BUILDER_UNIT, EntityType::MELEE_BASE, EntityType::MELEE_UNIT, EntityType::RANGED_BASE, EntityType::RANGED_UNIT, EntityType::TURRET })),
             nullptr
