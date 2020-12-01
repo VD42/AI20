@@ -310,7 +310,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         );
     };
 
-    auto need_builders = std::max(20, static_cast<int>(units_limit * 0.5));
+    auto need_builders = std::max(50, static_cast<int>(units_limit * 0.5));
 
     const auto action_for_builder_base = [&] (Entity const& entity) {
         if (bases_ok() && builders < need_builders)
