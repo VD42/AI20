@@ -42,6 +42,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
 
     int builders = 0;
     std::vector<int> ranges;
+    int houses = 0;
 
     int builder_bases = 0;
     int ranged_bases = 0;
@@ -91,7 +92,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         }
         if (entity.playerId && *entity.playerId == playerView.myId && (entity.entityType == EntityType::BUILDER_BASE || entity.entityType == EntityType::MELEE_BASE || entity.entityType == EntityType::RANGED_BASE || entity.entityType == EntityType::HOUSE))
         {
-            units_limit += 5;
+            units_limit += playerView.entityProperties.at(entity.entityType).populationProvide;
             if (entity.health < playerView.entityProperties.at(entity.entityType).maxHealth)
                 to_repair.emplace_back(entity.id);
         }
@@ -105,6 +106,8 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             ++builders;
         if (entity.playerId && *entity.playerId == playerView.myId && entity.entityType == EntityType::RANGED_UNIT)
             ranges.emplace_back(entity.id);
+        if (entity.playerId && *entity.playerId == playerView.myId && entity.entityType == EntityType::HOUSE)
+            ++houses;
         if (entity.playerId && *entity.playerId == playerView.myId && entity.entityType == EntityType::BUILDER_BASE)
             ++builder_bases;
         if (entity.playerId && *entity.playerId == playerView.myId && entity.entityType == EntityType::RANGED_BASE)
@@ -262,10 +265,14 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
     int need_ranged_bases = 1;
     int need_melee_bases = 0;
 
+    const auto need_houses = [&] () {
+        return (units_limit <= units + 4 * (builder_bases + ranged_bases));
+    };
+
     const auto bases_ok = [&] () {
         if (builder_bases < need_builder_bases) return false;
         if (ranged_bases < need_ranged_bases) return false;
-        if (units_limit <= units + 4 * (builder_bases + ranged_bases)) return false;
+        if (need_houses()) return false;
         return true;
     };
 
@@ -282,10 +289,10 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             const auto pos = find_place_for_base(entity, EntityType::BUILDER_BASE);
             if (pos.x != entity.position.x && pos.y != entity.position.y && !pos_is_danger(pos))
             {
-                current_resources -= playerView.entityProperties.at(EntityType::BUILDER_BASE).cost;
+                current_resources -= playerView.entityProperties.at(EntityType::BUILDER_BASE).initialCost + builder_bases;
                 if (0 <= current_resources)
                 {
-                    units_limit += 5;
+                    units_limit += playerView.entityProperties.at(EntityType::BUILDER_BASE).populationProvide;
                     builder_bases += 1;
                     return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::BUILDER_BASE, pos), nullptr, nullptr);
                 }
@@ -296,24 +303,24 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             const auto pos = find_place_for_base(entity, EntityType::RANGED_BASE);
             if (pos.x != entity.position.x && pos.y != entity.position.y && !pos_is_danger(pos))
             {
-                current_resources -= playerView.entityProperties.at(EntityType::RANGED_BASE).cost;
+                current_resources -= playerView.entityProperties.at(EntityType::RANGED_BASE).initialCost + ranged_bases;
                 if (0 <= current_resources)
                 {
-                    units_limit += 5;
+                    units_limit += playerView.entityProperties.at(EntityType::RANGED_BASE).populationProvide;
                     ranged_bases += 1;
                     return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::RANGED_BASE, pos), nullptr, nullptr);
                 }
             }
         }
-        else if (units_limit <= units + 4 * (builder_bases + ranged_bases))
+        else if (need_houses())
         {
             const auto pos = find_place_for_base(entity, EntityType::HOUSE);
             if (pos.x != entity.position.x && pos.y != entity.position.y && !pos_is_danger(pos))
             {
-                current_resources -= playerView.entityProperties.at(EntityType::HOUSE).cost;
+                current_resources -= playerView.entityProperties.at(EntityType::HOUSE).initialCost + houses;
                 if (0 <= current_resources)
                 {
-                    units_limit += 5;
+                    units_limit += playerView.entityProperties.at(EntityType::HOUSE).populationProvide;
                     return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::HOUSE, pos), nullptr, nullptr);
                 }
             }
@@ -353,14 +360,14 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
     const auto action_for_builder_base = [&] (Entity const& entity) {
         if (bases_ok() && builders < need_builders)
         {
-            auto available_resources = (need_ranges - close_ranges) * playerView.entityProperties.at(EntityType::RANGED_UNIT).cost;
+            auto available_resources = (need_ranges - close_ranges) * (playerView.entityProperties.at(EntityType::RANGED_UNIT).initialCost + ranges.size());
             if (0 < available_resources)
                 available_resources = current_resources - available_resources;
             else
                 available_resources = current_resources;
-            if (playerView.entityProperties.at(EntityType::BUILDER_UNIT).cost <= available_resources)
+            if ((playerView.entityProperties.at(EntityType::BUILDER_UNIT).initialCost + builders) <= available_resources)
             {
-                current_resources -= playerView.entityProperties.at(EntityType::BUILDER_UNIT).cost;
+                current_resources -= playerView.entityProperties.at(EntityType::BUILDER_UNIT).initialCost + builders;
                 if (0 <= current_resources)
                 {
                     const auto pos = find_place_for_unit(entity);
@@ -374,7 +381,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
     const auto action_for_ranged_base = [&] (Entity const& entity) {
         if (bases_ok())
         {
-            current_resources -= playerView.entityProperties.at(EntityType::RANGED_UNIT).cost;
+            current_resources -= playerView.entityProperties.at(EntityType::RANGED_UNIT).initialCost + static_cast<int>(ranges.size());
             if (0 <= current_resources)
             {
                 const auto pos = find_place_for_unit(entity);
@@ -433,6 +440,6 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
 
 void MyStrategy::debugUpdate(PlayerView const& playerView, DebugInterface & debugInterface)
 {
-    debugInterface.send(DebugCommand::Clear());
-    debugInterface.getState();
+    //debugInterface.send(DebugCommand::Clear());
+    //debugInterface.getState();
 }
