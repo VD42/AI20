@@ -1,3 +1,3 @@
 @echo off
 start aicup2020.exe --config config.json
-..\strategy\x64\Debug\AI20.exe
+..\strategy\x64\Release\AI20.exe

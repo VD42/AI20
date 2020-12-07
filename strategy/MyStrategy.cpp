@@ -136,19 +136,6 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         for (int i = entity.position.x - border; i < entity.position.x + playerView.entityProperties.at(entity.entityType).size + border; ++i)
             for (int j = entity.position.y - border; j < entity.position.y + playerView.entityProperties.at(entity.entityType).size + border; ++j)
                 get_placement_build(i, j) = entity.id;
-        if (entity.playerId && *entity.playerId == playerView.myId && (entity.entityType == EntityType::BUILDER_BASE || entity.entityType == EntityType::MELEE_BASE || entity.entityType == EntityType::RANGED_BASE))
-        {
-            for (int j = entity.position.y; j < entity.position.y + playerView.entityProperties.at(entity.entityType).size; ++j)
-            {
-                get_placement(entity.position.x - 1, j) = -entity.id;
-                get_placement(entity.position.x + playerView.entityProperties.at(entity.entityType).size, j) = -entity.id;
-            }
-            for (int i = entity.position.x; i < entity.position.x + playerView.entityProperties.at(entity.entityType).size; ++i)
-            {
-                get_placement(i, entity.position.y - 1) = -entity.id;
-                get_placement(i, entity.position.y + playerView.entityProperties.at(entity.entityType).size) = -entity.id;
-            }
-        }
         if (entity.playerId && *entity.playerId == playerView.myId && (entity.entityType == EntityType::BUILDER_BASE || entity.entityType == EntityType::MELEE_BASE || entity.entityType == EntityType::RANGED_BASE || entity.entityType == EntityType::HOUSE))
         {
             units_limit += playerView.entityProperties.at(entity.entityType).populationProvide;
@@ -187,20 +174,55 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
 
     std::sort(order.begin(), order.end());
 
-    const auto find_place_for_unit = [&] (Entity const& entity) {
+    const auto find_place_for_unit = [&] (Entity const& entity, Entity const& closest_to) {
+        auto minx = entity.position.x;
+        auto miny = entity.position.y;
+        auto mind = playerView.mapSize * 2;
         for (int j = entity.position.y + playerView.entityProperties.at(entity.entityType).size - 1; entity.position.y <= j; --j)
-            if (get_placement(entity.position.x + playerView.entityProperties.at(entity.entityType).size, j) == -entity.id)
-                return Vec2Int(entity.position.x + playerView.entityProperties.at(entity.entityType).size, j);
+            if (get_placement(entity.position.x + playerView.entityProperties.at(entity.entityType).size, j) == 0)
+            {
+                const auto d = distance(Entity(-1, nullptr, EntityType::WALL, Vec2Int(entity.position.x + playerView.entityProperties.at(entity.entityType).size, j), 0, false), closest_to);
+                if (d < mind)
+                {
+                    minx = entity.position.x + playerView.entityProperties.at(entity.entityType).size;
+                    miny = j;
+                    mind = d;
+                }
+            }
         for (int i = entity.position.x + playerView.entityProperties.at(entity.entityType).size - 1; entity.position.x <= i; --i)
-            if (get_placement(i, entity.position.y + playerView.entityProperties.at(entity.entityType).size) == -entity.id)
-                return Vec2Int(i, entity.position.y + playerView.entityProperties.at(entity.entityType).size);
+            if (get_placement(i, entity.position.y + playerView.entityProperties.at(entity.entityType).size) == 0)
+            {
+                const auto d = distance(Entity(-1, nullptr, EntityType::WALL, Vec2Int(i, entity.position.y + playerView.entityProperties.at(entity.entityType).size), 0, false), closest_to);
+                if (d < mind)
+                {
+                    minx = i;
+                    miny = entity.position.y + playerView.entityProperties.at(entity.entityType).size;
+                    mind = d;
+                }
+            }
         for (int i = entity.position.x + playerView.entityProperties.at(entity.entityType).size - 1; entity.position.x <= i; --i)
-            if (get_placement(i, entity.position.y - 1) == -entity.id)
-                return Vec2Int(i, entity.position.y - 1);
+            if (get_placement(i, entity.position.y - 1) == 0)
+            {
+                const auto d = distance(Entity(-1, nullptr, EntityType::WALL, Vec2Int(i, entity.position.y - 1), 0, false), closest_to);
+                if (d < mind)
+                {
+                    minx = i;
+                    miny = entity.position.y - 1;
+                    mind = d;
+                }
+            }
         for (int j = entity.position.y + playerView.entityProperties.at(entity.entityType).size - 1; entity.position.y <= j; --j)
-            if (get_placement(entity.position.x - 1, j) == -entity.id)
-                return Vec2Int(entity.position.x -1, j);
-        return entity.position;
+            if (get_placement(entity.position.x - 1, j) == 0)
+            {
+                const auto d = distance(Entity(-1, nullptr, EntityType::WALL, Vec2Int(entity.position.x - 1, j), 0, false), closest_to);
+                if (d < mind)
+                {
+                    minx = entity.position.x - 1;
+                    miny = j;
+                    mind = d;
+                }
+            }
+        return Vec2Int(minx, miny);
     };
 
     const auto find_place_for_base = [&] (Entity const& entity, EntityType type) {
@@ -454,7 +476,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             if (playerView.entities[id_to_index[id]].entityType != EntityType::MELEE_BASE && (resources.empty() || distance(entity, playerView.entities[id_to_index[id]]) <= (playerView.entities[id_to_index[id]].entityType == EntityType::RANGED_BASE || playerView.entities[id_to_index[id]].entityType == EntityType::BUILDER_BASE ? 3 : 1)))
             {
                 return EntityAction(
-                    std::make_unique<MoveAction>(find_place_for_unit(playerView.entities[id_to_index[id]]), true, false),
+                    std::make_unique<MoveAction>(find_place_for_unit(playerView.entities[id_to_index[id]], entity), true, false),
                     nullptr,
                     nullptr,
                     std::make_unique<RepairAction>(id)
@@ -493,7 +515,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
                 current_resources -= playerView.entityProperties.at(EntityType::BUILDER_UNIT).initialCost + builders;
                 if (0 <= current_resources)
                 {
-                    const auto pos = find_place_for_unit(entity);
+                    const auto pos = find_place_for_unit(entity, playerView.entities[id_to_index[get_closest_to_base_entity(resources)]]);
                     return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::BUILDER_UNIT, pos), nullptr, nullptr);
                 }
             }
@@ -507,7 +529,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             current_resources -= playerView.entityProperties.at(EntityType::RANGED_UNIT).initialCost + static_cast<int>(ranges.size());
             if (0 <= current_resources)
             {
-                const auto pos = find_place_for_unit(entity);
+                const auto pos = find_place_for_unit(entity, playerView.entities[id_to_index[get_closest_to_base_entity(to_attack)]]);
                 return EntityAction(nullptr, std::make_unique<BuildAction>(EntityType::RANGED_UNIT, pos), nullptr, nullptr);
             }
         }
