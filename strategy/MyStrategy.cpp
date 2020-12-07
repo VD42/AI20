@@ -353,7 +353,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
     };
 
     const auto need_houses = [&] () {
-        return (builders_ok() && units_limit <= units + 4 * (builder_bases + ranged_bases));
+        return (builders_ok() && units_limit <= units + 10);
     };
 
     const auto bases_ok = [&] () {
@@ -473,7 +473,14 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         if (!to_repair.empty())
         {
             const auto id = get_closest_entity(entity, to_repair);
-            if (playerView.entities[id_to_index[id]].entityType != EntityType::MELEE_BASE && (resources.empty() || distance(entity, playerView.entities[id_to_index[id]]) <= (playerView.entities[id_to_index[id]].entityType == EntityType::RANGED_BASE || playerView.entities[id_to_index[id]].entityType == EntityType::BUILDER_BASE ? 3 : 1)))
+            const auto range = [&] () {
+                switch (playerView.entities[id_to_index[id]].entityType)
+                {
+                default:
+                    return 3;
+                }
+            }();
+            if (playerView.entities[id_to_index[id]].entityType != EntityType::MELEE_BASE && (resources.empty() || distance(entity, playerView.entities[id_to_index[id]]) <= range))
             {
                 return EntityAction(
                     std::make_unique<MoveAction>(find_place_for_unit(playerView.entities[id_to_index[id]], entity), true, false),
