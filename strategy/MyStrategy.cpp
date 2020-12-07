@@ -152,7 +152,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         if (entity.playerId && *entity.playerId != playerView.myId && (entity.entityType == EntityType::MELEE_UNIT || entity.entityType == EntityType::RANGED_UNIT || entity.entityType == EntityType::TURRET))
         {
             danger.emplace_back(entity.id);
-            const int border = 2;
+            const int border = 3;
             for (int i = entity.position.x - border - playerView.entityProperties.at(entity.entityType).attack->attackRange; i < entity.position.x + border + playerView.entityProperties.at(entity.entityType).size + playerView.entityProperties.at(entity.entityType).attack->attackRange; ++i)
                 for (int j = entity.position.y - border - playerView.entityProperties.at(entity.entityType).attack->attackRange; j < entity.position.y + border + playerView.entityProperties.at(entity.entityType).size + playerView.entityProperties.at(entity.entityType).attack->attackRange; ++j)
                     if (distance(Entity(-1, nullptr, EntityType::WALL, Vec2Int(i, j), 0, false), entity) < playerView.entityProperties.at(entity.entityType).attack->attackRange + border)
@@ -292,6 +292,10 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
                 return player.resource;
         return 0;
     }();
+
+    for (auto const& entity : playerView.entities)
+        if (entity.playerId && *entity.playerId == playerView.myId && entity.entityType == EntityType::BUILDER_UNIT && distance(entity, playerView.entities[id_to_index[get_closest_entity(entity, resources)]]) == 1)
+            ++current_resources;
 
     int need_builder_bases = 1;
     int need_ranged_bases = 1;
