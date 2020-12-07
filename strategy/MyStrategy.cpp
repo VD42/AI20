@@ -18,12 +18,34 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
 
     const auto get_placement = [&] (size_t x, size_t y) -> int& {
         static int wrong_place;
-        wrong_place = std::numeric_limits<int>::min();
+        wrong_place = std::numeric_limits<int>::max();
         if (x < 0) return wrong_place;
         if (y < 0) return wrong_place;
         if (placement.size() <= x) return wrong_place;
         if (placement.size() <= y) return wrong_place;
         return placement[x][y];
+    };
+
+    static std::vector<std::vector<int>> placement_build;
+    if (placement_build.empty())
+    {
+        placement_build.reserve(playerView.mapSize);
+        for (int i = 0; i < playerView.mapSize; ++i)
+            placement_build.emplace_back(playerView.mapSize, 0);
+    }
+
+    for (int i = 0; i < playerView.mapSize; ++i)
+        for (int j = 0; j < playerView.mapSize; ++j)
+            placement_build[i][j] = 0;
+
+    const auto get_placement_build = [&] (size_t x, size_t y) -> int& {
+        static int wrong_place;
+        wrong_place = std::numeric_limits<int>::max();
+        if (x < 0) return wrong_place;
+        if (y < 0) return wrong_place;
+        if (placement_build.size() <= x) return wrong_place;
+        if (placement_build.size() <= y) return wrong_place;
+        return placement_build[x][y];
     };
 
     static std::vector<std::vector<int>> dangers;
@@ -106,11 +128,14 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         }
         id_to_index[entity.id] = index++;
         int border = 0;
+        for (int i = entity.position.x - border; i < entity.position.x + playerView.entityProperties.at(entity.entityType).size + border; ++i)
+            for (int j = entity.position.y - border; j < entity.position.y + playerView.entityProperties.at(entity.entityType).size + border; ++j)
+                get_placement(i, j) = entity.id;
         if (entity.playerId && *entity.playerId == playerView.myId && (entity.entityType == EntityType::BUILDER_BASE || entity.entityType == EntityType::MELEE_BASE || entity.entityType == EntityType::RANGED_BASE || entity.entityType == EntityType::HOUSE || entity.entityType == EntityType::TURRET))
             border = 1;
         for (int i = entity.position.x - border; i < entity.position.x + playerView.entityProperties.at(entity.entityType).size + border; ++i)
             for (int j = entity.position.y - border; j < entity.position.y + playerView.entityProperties.at(entity.entityType).size + border; ++j)
-                get_placement(i, j) = entity.id;
+                get_placement_build(i, j) = entity.id;
         if (entity.playerId && *entity.playerId == playerView.myId && (entity.entityType == EntityType::BUILDER_BASE || entity.entityType == EntityType::MELEE_BASE || entity.entityType == EntityType::RANGED_BASE))
         {
             for (int j = entity.position.y; j < entity.position.y + playerView.entityProperties.at(entity.entityType).size; ++j)
@@ -187,7 +212,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             for (int i = entity.position.x - size; i < entity.position.x; ++i)
             {
                 for (int j = start_y; j < start_y + size; ++j)
-                    if (get_placement(i, j) != 0)
+                    if (get_placement_build(i, j) != 0)
                     {
                         good = false;
                         break;
@@ -205,7 +230,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             for (int j = entity.position.y - size; j < entity.position.y; ++j)
             {
                 for (int i = start_x; i < start_x + size; ++i)
-                    if (get_placement(i, j) != 0)
+                    if (get_placement_build(i, j) != 0)
                     {
                         good = false;
                         break;
@@ -223,7 +248,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             for (int j = entity.position.y + 1; j <= entity.position.y + size; ++j)
             {
                 for (int i = start_x; i < start_x + size; ++i)
-                    if (get_placement(i, j) != 0)
+                    if (get_placement_build(i, j) != 0)
                     {
                         good = false;
                         break;
@@ -241,7 +266,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             for (int i = entity.position.x + 1; i <= entity.position.x + size; ++i)
             {
                 for (int j = start_y; j < start_y + size; ++j)
-                    if (get_placement(i, j) != 0)
+                    if (get_placement_build(i, j) != 0)
                     {
                         good = false;
                         break;
@@ -429,7 +454,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             if (playerView.entities[id_to_index[id]].entityType != EntityType::MELEE_BASE && (resources.empty() || distance(entity, playerView.entities[id_to_index[id]]) <= (playerView.entities[id_to_index[id]].entityType == EntityType::RANGED_BASE || playerView.entities[id_to_index[id]].entityType == EntityType::BUILDER_BASE ? 3 : 1)))
             {
                 return EntityAction(
-                    std::make_unique<MoveAction>(playerView.entities[id_to_index[id]].position, true, false),
+                    std::make_unique<MoveAction>(find_place_for_unit(playerView.entities[id_to_index[id]]), true, false),
                     nullptr,
                     nullptr,
                     std::make_unique<RepairAction>(id)
@@ -500,9 +525,9 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         for (int i = entity.position.x - safe_zone; i <= entity.position.x + safe_zone; ++i)
             for (int j = entity.position.y - safe_zone; j <= entity.position.y + safe_zone; ++j)
             {
-                if (const auto id = get_placement(i, j); 0 < id && playerView.entities[id_to_index[id]].playerId && *playerView.entities[id_to_index[id]].playerId == playerView.myId && (playerView.entities[id_to_index[id]].entityType == EntityType::RANGED_UNIT || playerView.entities[id_to_index[id]].entityType == EntityType::MELEE_UNIT))
+                if (const auto id = get_placement(i, j); 0 < id && id != std::numeric_limits<int>::max() && playerView.entities[id_to_index[id]].playerId && *playerView.entities[id_to_index[id]].playerId == playerView.myId && (playerView.entities[id_to_index[id]].entityType == EntityType::RANGED_UNIT || playerView.entities[id_to_index[id]].entityType == EntityType::MELEE_UNIT))
                     ++my_units;
-                if (const auto id = get_placement(i, j); 0 < id && playerView.entities[id_to_index[id]].playerId && *playerView.entities[id_to_index[id]].playerId != playerView.myId && (playerView.entities[id_to_index[id]].entityType == EntityType::RANGED_UNIT || playerView.entities[id_to_index[id]].entityType == EntityType::MELEE_UNIT))
+                if (const auto id = get_placement(i, j); 0 < id && id != std::numeric_limits<int>::max() && playerView.entities[id_to_index[id]].playerId && *playerView.entities[id_to_index[id]].playerId != playerView.myId && (playerView.entities[id_to_index[id]].entityType == EntityType::RANGED_UNIT || playerView.entities[id_to_index[id]].entityType == EntityType::MELEE_UNIT))
                     ++enemy_units;
             }
         if (my_units < enemy_units)
