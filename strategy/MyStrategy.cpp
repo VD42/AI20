@@ -412,7 +412,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             const auto pos = find_place_for_base(entity, EntityType::BUILDER_BASE);
             if (pos.x != entity.position.x && pos.y != entity.position.y && !pos_is_danger(pos))
             {
-                current_resources -= playerView.entityProperties.at(EntityType::BUILDER_BASE).initialCost + builder_bases;
+                current_resources -= playerView.entityProperties.at(EntityType::BUILDER_BASE).initialCost;
                 if (0 <= current_resources)
                 {
                     units_limit += playerView.entityProperties.at(EntityType::BUILDER_BASE).populationProvide;
@@ -426,7 +426,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             const auto pos = find_place_for_base(entity, EntityType::RANGED_BASE);
             if (pos.x != entity.position.x && pos.y != entity.position.y && !pos_is_danger(pos))
             {
-                current_resources -= playerView.entityProperties.at(EntityType::RANGED_BASE).initialCost + ranged_bases;
+                current_resources -= playerView.entityProperties.at(EntityType::RANGED_BASE).initialCost;
                 if (0 <= current_resources)
                 {
                     units_limit += playerView.entityProperties.at(EntityType::RANGED_BASE).populationProvide;
@@ -440,7 +440,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             const auto pos = find_place_for_base(entity, EntityType::HOUSE);
             if (pos.x != entity.position.x && pos.y != entity.position.y && !pos_is_danger(pos))
             {
-                current_resources -= playerView.entityProperties.at(EntityType::HOUSE).initialCost + houses;
+                current_resources -= playerView.entityProperties.at(EntityType::HOUSE).initialCost;
                 if (0 <= current_resources)
                 {
                     units_limit += playerView.entityProperties.at(EntityType::HOUSE).populationProvide;
