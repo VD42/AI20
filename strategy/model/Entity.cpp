@@ -1,15 +1,12 @@
 #include "Entity.hpp"
 
 Entity::Entity() { }
-Entity::Entity(int id, std::shared_ptr<int> playerId, EntityType entityType, Vec2Int position, int health, bool active) : id(id), playerId(playerId), entityType(entityType), position(position), health(health), active(active) { }
+Entity::Entity(int id, std::optional<int> playerId, EntityType entityType, Vec2Int position, int health, bool active) : id(id), playerId(playerId), entityType(entityType), position(position), health(health), active(active) { }
 Entity Entity::readFrom(InputStream& stream) {
     Entity result;
     result.id = stream.readInt();
     if (stream.readBool()) {
-        result.playerId = std::shared_ptr<int>(new int());
-        *result.playerId = stream.readInt();
-    } else {
-        result.playerId = std::shared_ptr<int>();
+        result.playerId = stream.readInt();
     }
     switch (stream.readInt()) {
     case 0:

@@ -1,7 +1,7 @@
 #include "BuildProperties.hpp"
 
 BuildProperties::BuildProperties() { }
-BuildProperties::BuildProperties(std::vector<EntityType> options, std::shared_ptr<int> initHealth) : options(options), initHealth(initHealth) { }
+BuildProperties::BuildProperties(std::vector<EntityType> options, std::optional<int> initHealth) : options(std::move(options)), initHealth(initHealth) { }
 BuildProperties BuildProperties::readFrom(InputStream& stream) {
     BuildProperties result;
     result.options = std::vector<EntityType>(stream.readInt());
@@ -42,10 +42,7 @@ BuildProperties BuildProperties::readFrom(InputStream& stream) {
         }
     }
     if (stream.readBool()) {
-        result.initHealth = std::shared_ptr<int>(new int());
-        *result.initHealth = stream.readInt();
-    } else {
-        result.initHealth = std::shared_ptr<int>();
+        result.initHealth = stream.readInt();
     }
     return result;
 }

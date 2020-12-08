@@ -7,13 +7,14 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <optional>
 
 class BuildProperties {
 public:
     std::vector<EntityType> options;
-    std::shared_ptr<int> initHealth;
+    std::optional<int> initHealth;
     BuildProperties();
-    BuildProperties(std::vector<EntityType> options, std::shared_ptr<int> initHealth);
+    BuildProperties(std::vector<EntityType> options, std::optional<int> initHealth);
     static BuildProperties readFrom(InputStream& stream);
     void writeTo(OutputStream& stream) const;
 };

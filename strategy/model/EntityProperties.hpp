@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <optional>
 
 class EntityProperties {
 public:
@@ -23,11 +24,11 @@ public:
     int initialCost;
     int sightRange;
     int resourcePerHealth;
-    std::shared_ptr<BuildProperties> build;
-    std::shared_ptr<AttackProperties> attack;
-    std::shared_ptr<RepairProperties> repair;
+    std::optional<BuildProperties> build;
+    std::optional<AttackProperties> attack;
+    std::optional<RepairProperties> repair;
     EntityProperties();
-    EntityProperties(int size, int buildScore, int destroyScore, bool canMove, int populationProvide, int populationUse, int maxHealth, int initialCost, int sightRange, int resourcePerHealth, std::shared_ptr<BuildProperties> build, std::shared_ptr<AttackProperties> attack, std::shared_ptr<RepairProperties> repair);
+    EntityProperties(int size, int buildScore, int destroyScore, bool canMove, int populationProvide, int populationUse, int maxHealth, int initialCost, int sightRange, int resourcePerHealth, std::optional<BuildProperties> build, std::optional<AttackProperties> attack, std::optional<RepairProperties> repair);
     static EntityProperties readFrom(InputStream& stream);
     void writeTo(OutputStream& stream) const;
 };

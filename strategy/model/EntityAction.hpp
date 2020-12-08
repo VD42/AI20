@@ -13,15 +13,16 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <optional>
 
 class EntityAction {
 public:
-    std::shared_ptr<MoveAction> moveAction;
-    std::shared_ptr<BuildAction> buildAction;
-    std::shared_ptr<AttackAction> attackAction;
-    std::shared_ptr<RepairAction> repairAction;
+    std::optional<MoveAction> moveAction;
+    std::optional<BuildAction> buildAction;
+    std::optional<AttackAction> attackAction;
+    std::optional<RepairAction> repairAction;
     EntityAction();
-    EntityAction(std::shared_ptr<MoveAction> moveAction, std::shared_ptr<BuildAction> buildAction, std::shared_ptr<AttackAction> attackAction, std::shared_ptr<RepairAction> repairAction);
+    EntityAction(std::optional<MoveAction> moveAction, std::optional<BuildAction> buildAction, std::optional<AttackAction> attackAction, std::optional<RepairAction> repairAction);
     static EntityAction readFrom(InputStream& stream);
     void writeTo(OutputStream& stream) const;
 };

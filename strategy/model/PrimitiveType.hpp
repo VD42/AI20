@@ -3,7 +3,7 @@
 
 #include "../Stream.hpp"
 
-enum PrimitiveType {
+enum class PrimitiveType {
     LINES = 0,
     TRIANGLES = 1
 };

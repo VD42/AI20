@@ -14,7 +14,7 @@ void ClientMessage::DebugMessage::writeTo(OutputStream& stream) const {
 }
 
 ClientMessage::ActionMessage::ActionMessage() { }
-ClientMessage::ActionMessage::ActionMessage(Action action) : action(action) { }
+ClientMessage::ActionMessage::ActionMessage(Action action) : action(std::move(action)) { }
 ClientMessage::ActionMessage ClientMessage::ActionMessage::readFrom(InputStream& stream) {
     ClientMessage::ActionMessage result;
     result.action = Action::readFrom(stream);
