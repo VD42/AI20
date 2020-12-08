@@ -92,15 +92,19 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
     int builder_bases = 0;
     int ranged_bases = 0;
 
+    std::vector<int> attackers;
+
     const auto distance = [&] (Entity const& entity1, Entity const& entity2) {
         int mind = playerView.mapSize * 2;
         for (int i = entity2.position.x; i < entity2.position.x + playerView.entityProperties.at(entity2.entityType).size; ++i)
             for (int j = entity2.position.y; j < entity2.position.y + playerView.entityProperties.at(entity2.entityType).size; ++j)
-            {
-                const auto d = std::abs(entity1.position.x - i) + std::abs(entity1.position.y - j);
-                if (d < mind)
-                    mind = d;
-            }
+                for (int k = entity1.position.x; k < entity1.position.x + playerView.entityProperties.at(entity1.entityType).size; ++k)
+                    for (int l = entity1.position.y; l < entity1.position.y + playerView.entityProperties.at(entity1.entityType).size; ++l)
+                    {
+                        const auto d = std::abs(k - i) + std::abs(l - j);
+                        if (d < mind)
+                            mind = d;
+                    }
         return mind;
     };
 
@@ -171,6 +175,8 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
                     if (distance(Entity(-1, std::nullopt, EntityType::WALL, Vec2Int(i, j), 0, false), entity) < playerView.entityProperties.at(entity.entityType).attack->attackRange + border)
                         get_dangers(i, j) += playerView.entityProperties.at(entity.entityType).attack->damage * (playerView.entityProperties.at(entity.entityType).attack->attackRange + border - distance(Entity(-1, std::nullopt, EntityType::WALL, Vec2Int(i, j), 0, false), entity));
         }
+        if (entity.playerId && *entity.playerId == playerView.myId && (entity.entityType == EntityType::RANGED_UNIT || entity.entityType == EntityType::MELEE_UNIT || entity.entityType == EntityType::TURRET))
+            attackers.emplace_back(entity.id);
     }
 
     std::sort(order.begin(), order.end());
@@ -551,10 +557,97 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         return EntityAction(std::nullopt, std::nullopt, std::nullopt, std::nullopt);
     };
 
+    std::vector<std::vector<std::pair<int, int>>> attack_variants;
+
+    for (auto const& attacker : attackers)
+    {
+        auto const& entity = playerView.entities[id_to_index[attacker]];
+        std::vector<int> targets;
+        for (auto const& attack : to_attack)
+        {
+            auto const& enemy = playerView.entities[id_to_index[attack]];
+            auto const d = distance(entity, enemy);
+            if (playerView.entityProperties.at(entity.entityType).attack->attackRange < d)
+                continue;
+            targets.emplace_back(attack);
+        }
+        const auto size = attack_variants.size();
+        if (size == 0)
+        {
+            if (0 < targets.size())
+            {
+                attack_variants.push_back({});
+                for (auto const& target : targets)
+                    attack_variants.back().emplace_back(attacker, target);
+            }
+        }
+        else
+        {
+            for (size_t i = 0; i < size; ++i)
+            {
+                for (size_t j = 0; j < targets.size(); ++j)
+                {
+                    if (j + 1 < targets.size())
+                    {
+                        attack_variants.push_back(attack_variants[i]);
+                        attack_variants.back().emplace_back(attacker, targets[j]);
+                    }
+                    else
+                    {
+                        attack_variants[i].emplace_back(attacker, targets[j]);
+                    }
+                }
+            }
+        }
+    }
+
     std::unordered_map<int, int> to_attack_health_map;
     to_attack_health_map.reserve(to_attack.size());
-    for (auto const& attack : to_attack)
-        to_attack_health_map[attack] = playerView.entities[id_to_index[attack]].health;
+
+    const auto simulate_attack = [&] (std::vector<std::pair<int, int>> const& attack_variant)
+    {
+        for (auto const& attack : to_attack)
+            to_attack_health_map[attack] = playerView.entities[id_to_index[attack]].health;
+        for (auto const& [id, eid] : attack_variant)
+        {
+            auto const& entity = playerView.entities[id_to_index[id]];
+            auto const& enemy = playerView.entities[id_to_index[eid]];
+            to_attack_health_map[eid] -= playerView.entityProperties.at(entity.entityType).attack->damage;
+        }
+        int destroyed = 0;
+        int points = 0;
+        int health = 0;
+        int distance_to_base = 0;
+        for (auto const& attack : to_attack)
+        {
+            if (to_attack_health_map[attack] <= 0)
+            {
+                --destroyed;
+                points -= playerView.entityProperties.at(playerView.entities[id_to_index[attack]].entityType).destroyScore;
+            }
+            else
+            {
+                health += to_attack_health_map[attack];
+                distance_to_base += distance(Entity(-1, std::nullopt, EntityType::WALL, Vec2Int(0, 0), 0, false), playerView.entities[id_to_index[attack]]);
+            }
+        }
+        return std::make_tuple(points, destroyed, health, distance_to_base);
+    };
+
+    size_t best_attack_variant = 0;
+    std::tuple<int, int, int, int> best_attack_score = { 0, 0, std::numeric_limits<int>::max(), std::numeric_limits<int>::max() };
+    //printf("Variants: %d\n", static_cast<int>(attack_variants.size()));
+    for (size_t i = 0; i < attack_variants.size(); ++i)
+    {
+        const auto score = simulate_attack(attack_variants[i]);
+        //printf("[%d]\t%d\t%d\t%d\t%d\n", static_cast<int>(i), -std::get<0>(score), -std::get<1>(score), std::get<2>(score), std::get<3>(score));
+        if (score < best_attack_score)
+        {
+            best_attack_variant = i;
+            best_attack_score = score;
+        }
+    }
+    //printf("Best: %d\n\n", static_cast<int>(best_attack_variant));
 
     const auto action_for_ranged_unit = [&] (Entity const& entity) {
         const auto safe_zone = 5;
@@ -575,42 +668,15 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
                 return sm;
         }
 
-        std::vector<std::tuple<int, int, int, int>> candidates;
-        for (auto const& attack : to_attack)
-        {
-            auto const& enemy = playerView.entities[id_to_index[attack]];
-            if (to_attack_health_map[enemy.id] <= 0)
-                continue;
-            auto const d = distance(entity, enemy);
-            if (playerView.entityProperties.at(entity.entityType).attack->attackRange < d)
-                continue;
-            candidates.emplace_back(std::make_tuple(
-                std::max(0, to_attack_health_map[enemy.id] - playerView.entityProperties.at(entity.entityType).attack->damage),
-                d,
-                [&] () {
-                    switch (entity.entityType)
-                    {
-                    case EntityType::RANGED_BASE: return 0;
-                    case EntityType::BUILDER_BASE: return 1;
-                    case EntityType::MELEE_BASE: return 2;
-                    case EntityType::RANGED_UNIT: return 3;
-                    case EntityType::MELEE_UNIT: return 4;
-                    case EntityType::TURRET: return 5;
-                    case EntityType::BUILDER_UNIT: return 6;
-                    case EntityType::HOUSE: return 7;
-                    case EntityType::WALL: return 8;
-                    }
-                    return 100;
-                }(),
-                enemy.id
-            ));
-        }
         int id = -1;
-        std::sort(candidates.begin(), candidates.end());
-        if (0 < candidates.size())
+        if (0 < attack_variants.size())
         {
-            id = std::get<3>(candidates.front());
-            to_attack_health_map[id] -= playerView.entityProperties.at(entity.entityType).attack->damage;
+            for (auto const& [mid, eid] : attack_variants[best_attack_variant])
+                if (mid == entity.id)
+                {
+                    id = eid;
+                    break;
+                }
         }
 
         auto move_id = get_closest_to_base_entity(to_attack);
