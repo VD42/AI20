@@ -575,16 +575,18 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
                 return sm;
         }
 
-        std::vector<std::tuple<int, int, int>> candidates;
+        std::vector<std::tuple<int, int, int, int>> candidates;
         for (auto const& attack : to_attack)
         {
             auto const& enemy = playerView.entities[id_to_index[attack]];
             if (to_attack_health_map[enemy.id] <= 0)
                 continue;
-            if (playerView.entityProperties.at(entity.entityType).attack->attackRange < distance(entity, enemy))
+            auto const d = distance(entity, enemy);
+            if (playerView.entityProperties.at(entity.entityType).attack->attackRange < d)
                 continue;
             candidates.emplace_back(std::make_tuple(
                 std::max(0, to_attack_health_map[enemy.id] - playerView.entityProperties.at(entity.entityType).attack->damage),
+                d,
                 [&] () {
                     switch (entity.entityType)
                     {
@@ -607,7 +609,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         std::sort(candidates.begin(), candidates.end());
         if (0 < candidates.size())
         {
-            id = std::get<2>(candidates.front());
+            id = std::get<3>(candidates.front());
             to_attack_health_map[id] -= playerView.entityProperties.at(entity.entityType).attack->damage;
         }
 
