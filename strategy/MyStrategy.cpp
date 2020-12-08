@@ -353,7 +353,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
     };
 
     const auto need_houses = [&] () {
-        return (builders_ok() && units_limit <= units + 10);
+        return (builders_ok() && units_limit <= units + 4 * (builder_bases + ranged_bases));
     };
 
     const auto bases_ok = [&] () {
@@ -476,8 +476,11 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             const auto range = [&] () {
                 switch (playerView.entities[id_to_index[id]].entityType)
                 {
-                default:
+                case EntityType::BUILDER_BASE:
+                case EntityType::RANGED_BASE:
                     return 3;
+                default:
+                    return 1;
                 }
             }();
             if (playerView.entities[id_to_index[id]].entityType != EntityType::MELEE_BASE && (resources.empty() || distance(entity, playerView.entities[id_to_index[id]]) <= range))
