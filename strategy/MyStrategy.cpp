@@ -497,7 +497,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         return EntityAction(
             MoveAction((resources.empty() ? Vec2Int(0, 0) : playerView.entities[id_to_index[get_closest_to_base_entity(resources)]].position), true, false),
             std::nullopt,
-            AttackAction(std::nullopt, AutoAttack(playerView.mapSize * 2, std::vector<EntityType> { EntityType::RESOURCE })),
+            AttackAction(std::nullopt, AutoAttack(playerView.maxPathfindNodes, std::vector<EntityType> { EntityType::RESOURCE })),
             std::nullopt
         );
     };
@@ -551,6 +551,11 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         return EntityAction(std::nullopt, std::nullopt, std::nullopt, std::nullopt);
     };
 
+    std::unordered_map<int, int> to_attack_health_map;
+    to_attack_health_map.reserve(to_attack.size());
+    for (auto const& attack : to_attack)
+        to_attack_health_map[attack] = playerView.entities[id_to_index[attack]].health;
+
     const auto action_for_ranged_unit = [&] (Entity const& entity) {
         const auto safe_zone = 5;
         int my_units = 0;
@@ -569,10 +574,51 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             if (sm.moveAction)
                 return sm;
         }
+
+        std::vector<std::tuple<int, int, int>> candidates;
+        for (auto const& attack : to_attack)
+        {
+            auto const& enemy = playerView.entities[id_to_index[attack]];
+            if (to_attack_health_map[enemy.id] <= 0)
+                continue;
+            if (playerView.entityProperties.at(entity.entityType).attack->attackRange < distance(entity, enemy))
+                continue;
+            candidates.emplace_back(std::make_tuple(
+                std::max(0, to_attack_health_map[enemy.id] - playerView.entityProperties.at(entity.entityType).attack->damage),
+                [&] () {
+                    switch (entity.entityType)
+                    {
+                    case EntityType::RANGED_BASE: return 0;
+                    case EntityType::BUILDER_BASE: return 1;
+                    case EntityType::MELEE_BASE: return 2;
+                    case EntityType::RANGED_UNIT: return 3;
+                    case EntityType::MELEE_UNIT: return 4;
+                    case EntityType::TURRET: return 5;
+                    case EntityType::BUILDER_UNIT: return 6;
+                    case EntityType::HOUSE: return 7;
+                    case EntityType::WALL: return 8;
+                    }
+                    return 100;
+                }(),
+                enemy.id
+            ));
+        }
+        int id = -1;
+        std::sort(candidates.begin(), candidates.end());
+        if (0 < candidates.size())
+        {
+            id = std::get<2>(candidates.front());
+            to_attack_health_map[id] -= playerView.entityProperties.at(entity.entityType).attack->damage;
+        }
+
+        auto move_id = get_closest_to_base_entity(to_attack);
+        if (move_id == 0 || 15 < distance(entity, playerView.entities[id_to_index[move_id]]))
+            move_id = get_closest_entity(entity, to_attack);
+
         return EntityAction(
-            MoveAction(playerView.entities[id_to_index[get_closest_to_base_entity(to_attack)]].position, true, false),
+            MoveAction(move_id == 0 ? Vec2Int(0, 0) : playerView.entities[id_to_index[move_id]].position, true, true),
             std::nullopt,
-            AttackAction(std::nullopt, AutoAttack(playerView.mapSize * 2, std::vector<EntityType> { EntityType::HOUSE, EntityType::BUILDER_BASE, EntityType::BUILDER_UNIT, EntityType::MELEE_BASE, EntityType::MELEE_UNIT, EntityType::RANGED_BASE, EntityType::RANGED_UNIT, EntityType::TURRET })),
+            (id == -1 ? std::optional<AttackAction>() : AttackAction(id, std::nullopt)),
             std::nullopt
         );
     };
