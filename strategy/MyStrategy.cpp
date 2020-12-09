@@ -432,6 +432,127 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         return EntityAction(MoveAction(Vec2Int(minx, miny), false, true), std::nullopt, std::nullopt, std::nullopt);
     };
 
+    static std::vector<std::vector<int>> distance_map_tmp;
+    if (distance_map_tmp.empty())
+    {
+        distance_map_tmp.reserve(playerView.mapSize);
+        for (int i = 0; i < playerView.mapSize; ++i)
+            distance_map_tmp.emplace_back(playerView.mapSize, 0);
+    }
+
+    const auto generate_distance_map = [&] (Entity const& entity) {
+        for (int i = 0; i < playerView.mapSize; ++i)
+            for (int j = 0; j < playerView.mapSize; ++j)
+                distance_map_tmp[i][j] = (get_placement(i, j) == 0 ? -1 : std::numeric_limits<int>::max());
+        distance_map_tmp[entity.position.x][entity.position.y] = 0;
+        int i = 0;
+        for (int d = 0; d < playerView.mapSize * playerView.mapSize; ++d)
+        {
+            bool found = false;
+            for (int i = 0; i < playerView.mapSize; ++i)
+                for (int j = 0; j < playerView.mapSize; ++j)
+                    if (distance_map_tmp[i][j] == d)
+                    {
+                        if (0 <= i - 1 && distance_map_tmp[i - 1][j] == -1)
+                        {
+                            found = true;
+                            distance_map_tmp[i - 1][j] = d + 1;
+                        }
+                        if (i + 1 < playerView.mapSize && distance_map_tmp[i + 1][j] == -1)
+                        {
+                            found = true;
+                            distance_map_tmp[i + 1][j] = d + 1;
+                        }
+                        if (0 <= j - 1 && distance_map_tmp[i][j - 1] == -1)
+                        {
+                            found = true;
+                            distance_map_tmp[i][j - 1] = d + 1;
+                        }
+                        if (j + 1 < playerView.mapSize && distance_map_tmp[i][j + 1] == -1)
+                        {
+                            found = true;
+                            distance_map_tmp[i][j + 1] = d + 1;
+                        }
+                    }
+            if (!found)
+                break;
+        }
+        for (int i = 0; i < playerView.mapSize; ++i)
+            for (int j = 0; j < playerView.mapSize; ++j)
+                if (distance_map_tmp[i][j] == -1)
+                    distance_map_tmp[i][j] = std::numeric_limits<int>::max();
+        return distance_map_tmp;
+    };
+
+    const auto generate_path_close = [&] (Entity const& entity, std::vector<std::vector<int>> const& map, int id) -> std::optional<std::vector<Vec2Int>> {
+        auto x = playerView.entities[id_to_index[id]].position.x;
+        auto y = playerView.entities[id_to_index[id]].position.y;
+        auto mind = std::numeric_limits<int>::max();
+        int minx = 0;
+        int miny = 0;
+        if (map[x][y] < mind)
+        {
+            mind = map[x][y];
+            minx = x;
+            miny = y;
+        }
+        if (0 <= x - 1 && map[x - 1][y] < mind)
+        {
+            mind = map[x - 1][y];
+            minx = x - 1;
+            miny = y;
+        }
+        if (x + 1 < playerView.mapSize && map[x + 1][y] < mind)
+        {
+            mind = map[x + 1][y];
+            minx = x + 1;
+            miny = y;
+        }
+        if (0 <= y - 1 && map[x][y - 1] < mind)
+        {
+            mind = map[x][y - 1];
+            minx = x;
+            miny = y - 1;
+        }
+        if (y + 1 < playerView.mapSize && map[x][y + 1] < mind)
+        {
+            mind = map[x][y + 1];
+            minx = x;
+            miny = y + 1;
+        }
+        if (mind == std::numeric_limits<int>::max())
+            return std::nullopt;
+        std::vector<Vec2Int> path;
+        
+        while (map[minx][miny] != 0)
+        {
+            path.push_back(Vec2Int(minx, miny));
+            --mind;
+            if (0 <= minx - 1 && map[minx - 1][miny] == mind)
+            {
+                minx = minx - 1;
+                continue;
+            }
+            if (minx + 1 < playerView.mapSize && map[minx + 1][miny] == mind)
+            {
+                minx = minx + 1;
+                continue;
+            }
+            if (0 <= miny - 1 && map[minx][miny - 1] == mind)
+            {
+                miny = miny - 1;
+                continue;
+            }
+            if (miny + 1 < playerView.mapSize && map[minx][miny + 1] == mind)
+            {
+                miny = miny + 1;
+                continue;
+            }
+        }
+
+        return path;
+    };
+
     const auto action_for_builder_unit = [&] (Entity const& entity) {
         const auto sm = safe_move(entity);
         if (sm.moveAction)
@@ -500,6 +621,31 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
                 );
             }
         }
+
+        const auto map = generate_distance_map(entity);
+        auto mind = std::numeric_limits<int>::max();
+        std::vector<Vec2Int> min_path;
+        int minr = 0;
+        for (auto const& resource : resources)
+        {
+            auto test = generate_path_close(entity, map, resource);
+            if (test.has_value())
+            {
+                if (test.value().size() < mind)
+                {
+                    mind = static_cast<int>(test.value().size());
+                    min_path = test.value();
+                    minr = resource;
+                }
+            }
+        }
+        if (mind != std::numeric_limits<int>::max())
+        {
+            if (min_path.size() == 0)
+                return EntityAction(MoveAction(playerView.entities[id_to_index[minr]].position, false, true), std::nullopt, std::nullopt, std::nullopt);
+            return EntityAction(MoveAction(min_path.back(), false, true), std::nullopt, std::nullopt, std::nullopt);
+        }
+
         return EntityAction(
             MoveAction((resources.empty() ? Vec2Int(0, 0) : playerView.entities[id_to_index[get_closest_to_base_entity(resources)]].position), true, false),
             std::nullopt,
