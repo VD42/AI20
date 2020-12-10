@@ -689,7 +689,11 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         return EntityAction(
             MoveAction(move_id == 0 ? Vec2Int(0, 0) : playerView.entities[id_to_index[move_id]].position, true, true),
             std::nullopt,
-            (id == -1 ? std::optional<AttackAction>() : AttackAction(id, std::nullopt)),
+            (
+                id == -1
+                ? AttackAction(std::nullopt, AutoAttack(playerView.maxPathfindNodes, std::vector<EntityType> { EntityType::HOUSE, EntityType::BUILDER_BASE, EntityType::BUILDER_UNIT, EntityType::MELEE_BASE, EntityType::MELEE_UNIT, EntityType::RANGED_BASE, EntityType::RANGED_UNIT, EntityType::TURRET, EntityType::WALL }))
+                : AttackAction(id, std::nullopt)
+            ),
             std::nullopt
         );
     };
