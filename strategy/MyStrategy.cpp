@@ -601,13 +601,20 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         }
     }
 
-    std::unordered_map<int, int> to_attack_health_map;
+    static std::unordered_map<int, int> to_attack_health_map;
     to_attack_health_map.reserve(to_attack.size());
+
+    static std::unordered_map<int, int> to_attack_health_map_before;
+    to_attack_health_map_before.reserve(to_attack.size());
+
+    for (auto const& attack : to_attack)
+        to_attack_health_map_before[attack] = playerView.entities[id_to_index[attack]].health;
+
+    static Entity base_emulator(-1, std::nullopt, EntityType::WALL, Vec2Int(0, 0), 0, false);
 
     const auto simulate_attack = [&] (std::vector<std::pair<int, int>> const& attack_variant)
     {
-        for (auto const& attack : to_attack)
-            to_attack_health_map[attack] = playerView.entities[id_to_index[attack]].health;
+        to_attack_health_map = to_attack_health_map_before;
         for (auto const& [id, eid] : attack_variant)
         {
             auto const& entity = playerView.entities[id_to_index[id]];
@@ -628,7 +635,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             else
             {
                 health += to_attack_health_map[attack];
-                distance_to_base += distance(Entity(-1, std::nullopt, EntityType::WALL, Vec2Int(0, 0), 0, false), playerView.entities[id_to_index[attack]]);
+                distance_to_base += distance(base_emulator, playerView.entities[id_to_index[attack]]);
             }
         }
         return std::make_tuple(points, destroyed, health, distance_to_base);
@@ -636,18 +643,15 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
 
     size_t best_attack_variant = 0;
     std::tuple<int, int, int, int> best_attack_score = { 0, 0, std::numeric_limits<int>::max(), std::numeric_limits<int>::max() };
-    //printf("Variants: %d\n", static_cast<int>(attack_variants.size()));
-    for (size_t i = 0; i < attack_variants.size(); ++i)
+    for (size_t i = 0; i < std::min(attack_variants.size(), static_cast<size_t>(5000)); ++i)
     {
         const auto score = simulate_attack(attack_variants[i]);
-        //printf("[%d]\t%d\t%d\t%d\t%d\n", static_cast<int>(i), -std::get<0>(score), -std::get<1>(score), std::get<2>(score), std::get<3>(score));
         if (score < best_attack_score)
         {
             best_attack_variant = i;
             best_attack_score = score;
         }
     }
-    //printf("Best: %d\n\n", static_cast<int>(best_attack_variant));
 
     const auto action_for_ranged_unit = [&] (Entity const& entity) {
         const auto safe_zone = 5;
