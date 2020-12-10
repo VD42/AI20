@@ -561,6 +561,9 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
 
     for (auto const& attacker : attackers)
     {
+        if (5000 < attack_variants.size())
+            break;
+
         auto const& entity = playerView.entities[id_to_index[attacker]];
         std::vector<int> targets;
         for (auto const& attack : to_attack)
@@ -574,12 +577,8 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         const auto size = attack_variants.size();
         if (size == 0)
         {
-            if (0 < targets.size())
-            {
-                attack_variants.push_back({});
-                for (auto const& target : targets)
-                    attack_variants.back().emplace_back(attacker, target);
-            }
+            for (auto const& target : targets)
+                attack_variants.emplace_back(1, std::make_pair(attacker, target));
         }
         else
         {
