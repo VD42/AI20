@@ -691,7 +691,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             std::nullopt,
             (
                 id == -1
-                ? AttackAction(std::nullopt, AutoAttack(playerView.maxPathfindNodes, std::vector<EntityType> { EntityType::HOUSE, EntityType::BUILDER_BASE, EntityType::BUILDER_UNIT, EntityType::MELEE_BASE, EntityType::MELEE_UNIT, EntityType::RANGED_BASE, EntityType::RANGED_UNIT, EntityType::TURRET, EntityType::WALL }))
+                ? AttackAction(std::nullopt, AutoAttack(0, std::vector<EntityType> { EntityType::HOUSE, EntityType::BUILDER_BASE, EntityType::BUILDER_UNIT, EntityType::MELEE_BASE, EntityType::MELEE_UNIT, EntityType::RANGED_BASE, EntityType::RANGED_UNIT, EntityType::TURRET, EntityType::WALL }))
                 : AttackAction(id, std::nullopt)
             ),
             std::nullopt
