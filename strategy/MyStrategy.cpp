@@ -356,11 +356,11 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
     int need_melee_bases = 0;
 
     const auto builders_ok = [&] () {
-        return (10 <= builders);
+        return (10 <= builders && 15 <= units_limit);
     };
 
     const auto need_houses = [&] () {
-        return (builders_ok() && units_limit <= units + 4 * (builder_bases + ranged_bases));
+        return ((builders_ok() || units_limit <= units) && units_limit <= units + 4 * (builder_bases + ranged_bases));
     };
 
     const auto bases_ok = [&] () {
@@ -687,7 +687,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             move_id = get_closest_entity(entity, to_attack);
 
         return EntityAction(
-            MoveAction(move_id == 0 ? Vec2Int(0, 0) : playerView.entities[id_to_index[move_id]].position, true, true),
+            MoveAction(move_id == 0 ? Vec2Int(playerView.mapSize / 4, playerView.mapSize / 4) : playerView.entities[id_to_index[move_id]].position, true, true),
             std::nullopt,
             (
                 id == -1
