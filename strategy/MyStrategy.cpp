@@ -356,18 +356,47 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
     int need_melee_bases = 0;
 
     const auto builders_ok = [&] () {
-        return (10 <= builders && 15 <= units_limit);
+        return ((ranged_bases == 0 ? 20 : 10) <= builders && 15 <= units_limit);
     };
 
     const auto need_houses = [&] () {
         return ((builders_ok() || units_limit <= units) && units_limit <= units + 4 * (builder_bases + ranged_bases));
     };
 
+    bool have_money_for_builder_base = false;
+    bool have_money_for_ranged_base = false;
+    bool have_money_for_house = false;
+
+    if (builders_ok() && builder_bases < need_builder_bases)
+    {
+        if (playerView.entityProperties.at(EntityType::BUILDER_BASE).initialCost <= current_resources)
+        {
+            have_money_for_builder_base = true;
+            current_resources -= playerView.entityProperties.at(EntityType::BUILDER_BASE).initialCost;
+        }
+    }
+    if (builders_ok() && ranged_bases < need_ranged_bases)
+    {
+        if (playerView.entityProperties.at(EntityType::RANGED_BASE).initialCost <= current_resources)
+        {
+            have_money_for_ranged_base = true;
+            current_resources -= playerView.entityProperties.at(EntityType::RANGED_BASE).initialCost;
+        }
+    }
+    if (need_houses())
+    {
+        if (playerView.entityProperties.at(EntityType::HOUSE).initialCost <= current_resources)
+        {
+            have_money_for_house = true;
+            current_resources -= playerView.entityProperties.at(EntityType::HOUSE).initialCost;
+        }
+    }
+
     const auto bases_ok = [&] () {
         if (!builders_ok()) return true;
-        if (builder_bases < need_builder_bases) return false;
-        if (ranged_bases < need_ranged_bases) return false;
-        if (need_houses()) return false;
+        if (builder_bases < need_builder_bases && !have_money_for_builder_base) return false;
+        if (ranged_bases < need_ranged_bases && !have_money_for_ranged_base) return false;
+        if (need_houses() && !have_money_for_house) return false;
         return true;
     };
 
@@ -450,7 +479,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
                 }
             }
         }
-        else if (builders_ok() && ranged_bases < need_ranged_bases)
+        if (builders_ok() && ranged_bases < need_ranged_bases && (need_builder_bases <= builder_bases || have_money_for_builder_base))
         {
             const auto pos = find_place_for_base(entity, EntityType::RANGED_BASE);
             if (pos.x != entity.position.x && pos.y != entity.position.y && !pos_is_danger(pos))
@@ -464,7 +493,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
                 }
             }
         }
-        else if (need_houses())
+        if (need_houses() && (!builders_ok() || need_builder_bases <= builder_bases || have_money_for_builder_base) && (!builders_ok() || need_ranged_bases <= ranged_bases || have_money_for_ranged_base))
         {
             const auto pos = find_place_for_base(entity, EntityType::HOUSE);
             if (pos.x != entity.position.x && pos.y != entity.position.y && !pos_is_danger(pos))
@@ -481,6 +510,8 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         {
             const auto id = get_closest_entity(entity, to_repair);
             const auto range = [&] () {
+                if (units_limit < 15)
+                    return 3;
                 switch (playerView.entities[id_to_index[id]].entityType)
                 {
                 case EntityType::BUILDER_BASE:
