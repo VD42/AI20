@@ -1,6 +1,7 @@
 #include "MyStrategy.hpp"
 #include <memory>
 #include <algorithm>
+#include <set>
 
 Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debugInterface)
 {
@@ -166,7 +167,7 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
             ++builder_bases;
         if (entity.playerId && *entity.playerId == playerView.myId && entity.entityType == EntityType::RANGED_BASE)
             ++ranged_bases;
-        if (entity.playerId && *entity.playerId != playerView.myId && (entity.entityType == EntityType::MELEE_UNIT || entity.entityType == EntityType::RANGED_UNIT || entity.entityType == EntityType::TURRET))
+        if (entity.playerId && *entity.playerId != playerView.myId && entity.active && (entity.entityType == EntityType::MELEE_UNIT || entity.entityType == EntityType::RANGED_UNIT || entity.entityType == EntityType::TURRET))
         {
             danger.emplace_back(entity.id);
             const int border = 3;
@@ -687,13 +688,40 @@ Action MyStrategy::getAction(PlayerView const& playerView, DebugInterface * debu
         const auto safe_zone = 5;
         int my_units = 0;
         int enemy_units = 0;
+        std::set<int> turrets;
         for (int i = entity.position.x - safe_zone; i <= entity.position.x + safe_zone; ++i)
             for (int j = entity.position.y - safe_zone; j <= entity.position.y + safe_zone; ++j)
             {
-                if (const auto id = get_placement(i, j); 0 < id && id != std::numeric_limits<int>::max() && playerView.entities[id_to_index[id]].playerId && *playerView.entities[id_to_index[id]].playerId == playerView.myId && (playerView.entities[id_to_index[id]].entityType == EntityType::RANGED_UNIT || playerView.entities[id_to_index[id]].entityType == EntityType::MELEE_UNIT))
-                    ++my_units;
-                if (const auto id = get_placement(i, j); 0 < id && id != std::numeric_limits<int>::max() && playerView.entities[id_to_index[id]].playerId && *playerView.entities[id_to_index[id]].playerId != playerView.myId && (playerView.entities[id_to_index[id]].entityType == EntityType::RANGED_UNIT || playerView.entities[id_to_index[id]].entityType == EntityType::MELEE_UNIT))
-                    ++enemy_units;
+                if (const auto id = get_placement(i, j); 0 < id && id != std::numeric_limits<int>::max() && playerView.entities[id_to_index[id]].playerId && *playerView.entities[id_to_index[id]].playerId == playerView.myId && (playerView.entities[id_to_index[id]].entityType == EntityType::RANGED_UNIT || playerView.entities[id_to_index[id]].entityType == EntityType::MELEE_UNIT || playerView.entities[id_to_index[id]].entityType == EntityType::TURRET))
+                {
+                    if (playerView.entities[id_to_index[id]].entityType == EntityType::TURRET)
+                    {
+                        if (playerView.entities[id_to_index[id]].active && turrets.count(id) == 0)
+                        {
+                            ++my_units;
+                            turrets.insert(id);
+                        }
+                    }
+                    else
+                    {
+                        ++my_units;
+                    }
+                }
+                if (const auto id = get_placement(i, j); 0 < id && id != std::numeric_limits<int>::max() && playerView.entities[id_to_index[id]].playerId && *playerView.entities[id_to_index[id]].playerId != playerView.myId && (playerView.entities[id_to_index[id]].entityType == EntityType::RANGED_UNIT || playerView.entities[id_to_index[id]].entityType == EntityType::MELEE_UNIT || playerView.entities[id_to_index[id]].entityType == EntityType::TURRET))
+                {
+                    if (playerView.entities[id_to_index[id]].entityType == EntityType::TURRET)
+                    {
+                        if (playerView.entities[id_to_index[id]].active && turrets.count(id) == 0)
+                        {
+                            ++enemy_units;
+                            turrets.insert(id);
+                        }
+                    }
+                    else
+                    {
+                        ++enemy_units;
+                    }
+                }
             }
         if (my_units < enemy_units)
         {
